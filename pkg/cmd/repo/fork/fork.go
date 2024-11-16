@@ -51,6 +51,7 @@ type ForkOptions struct {
 	ForkName          string
 	Rename            bool
 	DefaultBranchOnly bool
+        SafeUpstream      bool
 }
 
 type errWithExitCode interface {
@@ -134,6 +135,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork")
 	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add a git remote for the fork")
+	cmd.Flags().BoolVar(&opts.SafeUpstream, "safe-upstream", false, "Set upstream push to the fork")
 	cmd.Flags().StringVar(&opts.RemoteName, "remote-name", defaultRemoteName, "Specify the name for the new remote")
 	cmd.Flags().StringVar(&opts.Organization, "org", "", "Create the fork in an organization")
 	cmd.Flags().StringVar(&opts.ForkName, "fork-name", "", "Rename the forked repository")
@@ -361,6 +363,23 @@ func forkRun(opts *ForkOptions) error {
 
 			if _, err := gc.AddRemote(ctx, upstreamRemote, upstreamURL, []string{}); err != nil {
 				return err
+			}
+
+			if opts.SafeUpstream {
+				forkedRepoCloneURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
+
+				// Set upstream push URL to forked repository to help prevent unintented pushes
+				setUrlCmd, err := gc.Command(ctx, "remote", "set-url", upstreamRemote, "--push", forkedRepoCloneURL)
+				if err != nil {
+				      return err
+				}
+
+				_, err = setUrlCmd.Output()
+				if err != nil {
+				      return err
+				}
+
+				fmt.Fprintf(stderr, "%s Remote upstream push set to %s\n", cs.SuccessIcon(), cs.Bold(ghrepo.FullName(forkedRepo)))
 			}
 
 			if err := gc.SetRemoteResolution(ctx, upstreamRemote, "base"); err != nil {
