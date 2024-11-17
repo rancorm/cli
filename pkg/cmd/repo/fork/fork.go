@@ -379,7 +379,9 @@ func forkRun(opts *ForkOptions) error {
 				      return err
 				}
 
-				fmt.Fprintf(stderr, "%s Remote upstream push set to %s\n", cs.SuccessIcon(), cs.Bold(ghrepo.FullName(forkedRepo)))
+				if connectedToTerminal {
+					fmt.Fprintf(stderr, "%s Remote upstream push set to %s\n", cs.SuccessIcon(), cs.Bold(ghrepo.FullName(forkedRepo)))
+				}
 			}
 
 			if err := gc.SetRemoteResolution(ctx, upstreamRemote, "base"); err != nil {
