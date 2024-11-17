@@ -248,6 +248,7 @@ func forkRun(opts *ForkOptions) error {
 	protocolConfig := cfg.GitProtocol(repoToFork.RepoHost())
 	protocolIsConfiguredByUser := protocolConfig.Source == gh.ConfigUserProvided
 	protocol := protocolConfig.Value
+	upstreamRemote := "upstream"
 
 	gitClient := opts.GitClient
 	ctx := context.Background()
@@ -323,6 +324,23 @@ func forkRun(opts *ForkOptions) error {
 			if connectedToTerminal {
 				fmt.Fprintf(stderr, "%s Added remote %s\n", cs.SuccessIcon(), cs.Bold(remoteName))
 			}
+			
+			if opts.SafeUpstream {
+				// Set upstream push URL to forked repository to help prevent unintented pushes
+				setUrlCmd, err := gitClient.Command(ctx, "remote", "set-url", upstreamRemote, "--push", forkedRepoCloneURL)
+				if err != nil {
+				      return err
+				}
+
+				_, err = setUrlCmd.Output()
+				if err != nil {
+				      return err
+				}
+
+				if connectedToTerminal {
+					fmt.Fprintf(stderr, "%s Remote upstream push set to %s\n", cs.SuccessIcon(), cs.Bold(ghrepo.FullName(forkedRepo)))
+				}
+			}
 		}
 	} else {
 		cloneDesired := opts.Clone
@@ -359,7 +377,6 @@ func forkRun(opts *ForkOptions) error {
 			gc := gitClient.Copy()
 			gc.RepoDir = cloneDir
 			upstreamURL := ghrepo.FormatRemoteURL(repoToFork, protocol)
-			upstreamRemote := "upstream"
 
 			if _, err := gc.AddRemote(ctx, upstreamRemote, upstreamURL, []string{}); err != nil {
 				return err
