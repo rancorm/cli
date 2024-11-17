@@ -297,6 +297,8 @@ func forkRun(opts *ForkOptions) error {
 			if err != nil {
 				return err
 			}
+			
+			forkedRepoCloneURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
 
 			if _, err := remotes.FindByName(remoteName); err == nil {
 				if opts.Rename {
@@ -309,12 +311,27 @@ func forkRun(opts *ForkOptions) error {
 					if err != nil {
 						return err
 					}
+
+					if opts.SafeUpstream {
+						// Set upstream push URL to forked repository to help prevent unintented pushes
+						setUrlCmd, err := gitClient.Command(ctx, "remote", "set-url", upstreamRemote, "--push", forkedRepoCloneURL)
+						if err != nil {
+							return err
+						}
+
+						_, err = setUrlCmd.Output()
+						if err != nil {
+							return err
+						}
+
+						if connectedToTerminal {
+							fmt.Fprintf(stderr, "%s Remote upstream push set to %s\n", cs.SuccessIcon(), cs.Bold(ghrepo.FullName(forkedRepo)))
+						}
+					}
 				} else {
 					return fmt.Errorf("a git remote named '%s' already exists", remoteName)
 				}
 			}
-
-			forkedRepoCloneURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
 
 			_, err = gitClient.AddRemote(ctx, remoteName, forkedRepoCloneURL, []string{})
 			if err != nil {
@@ -323,23 +340,6 @@ func forkRun(opts *ForkOptions) error {
 
 			if connectedToTerminal {
 				fmt.Fprintf(stderr, "%s Added remote %s\n", cs.SuccessIcon(), cs.Bold(remoteName))
-			}
-			
-			if opts.SafeUpstream {
-				// Set upstream push URL to forked repository to help prevent unintented pushes
-				setUrlCmd, err := gitClient.Command(ctx, "remote", "set-url", upstreamRemote, "--push", forkedRepoCloneURL)
-				if err != nil {
-				      return err
-				}
-
-				_, err = setUrlCmd.Output()
-				if err != nil {
-				      return err
-				}
-
-				if connectedToTerminal {
-					fmt.Fprintf(stderr, "%s Remote upstream push set to %s\n", cs.SuccessIcon(), cs.Bold(ghrepo.FullName(forkedRepo)))
-				}
 			}
 		}
 	} else {
